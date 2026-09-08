@@ -1,0 +1,128 @@
+[package]
+name = "maskforge-core"
+version.workspace = true
+description = "Bounded JSON Schema constrained-decoding engine."
+readme = "README.md"
+keywords = ["llm", "json-schema", "constrained-decoding"]
+categories = ["parsing", "algorithms"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+include = [
+    "src/**/*.rs",
+    "benches/*.rs",
+    "examples/*.rs",
+    "/README.md",
+    "/LICENSE",
+    "/PROVENANCE.md",
+    "/Cargo.toml",
+]
+
+[dependencies]
+regex-automata = { workspace = true }
+rustc-hash = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }
+fluent-uri = { workspace = true }
+thiserror = { workspace = true }
+# Hugging Face path (vendored modules), OFF by default so the core stays minimal and fast.
+once_cell = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tokenizers = { workspace = true, optional = true }
+hf-hub = { workspace = true, optional = true }
+
+[target.'cfg(windows)'.dependencies]
+# release_bench bin only (behind the benchmark-tools feature): peak-working-set probe via
+# GetProcessMemoryInfo. Optional so ordinary Windows core builds do not compile benchmark support.
+windows-sys = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+proptest = "1.11"
+rustc-hash = { workspace = true }
+serde_json = { workspace = true }
+
+[features]
+default = []
+# Installs a counting global allocator in the bench harness for a peak-allocation probe. Never
+# enable it for a timing run: the allocator atomics perturb microsecond measurements.
+alloc-probe = []
+# Exposes same-IR reference construction only to benchmark builds.
+bench-internals = []
+# Compiles the differential oracle and correctness corpus. Never enabled in a release build.
+test-utils = []
+# Benchmark-only OS support (the Windows peak-RSS probe), kept out of ordinary core builds.
+benchmark-tools = ["dep:windows-sys"]
+# Local tokenizer decoding, no network/TLS dependency - safe for the Python wheel.
+tokenizer-processing = ["dep:once_cell", "dep:serde", "dep:serde_json", "dep:tokenizers"]
+huggingface-hub = [
+    "tokenizer-processing",
+    "dep:hf-hub",
+    "tokenizers/http",
+    "tokenizers/rustls-tls",
+]
+
+[[bench]]
+name = "harness"
+harness = false
+required-features = ["test-utils"]
+
+[[bench]]
+name = "artifact_cache_contention"
+harness = false
+required-features = ["test-utils"]
+
+[[bench]]
+name = "prepared_vocab_sort"
+harness = false
+
+[[bench]]
+name = "lazy_rows_contention"
+harness = false
+required-features = ["test-utils"]
+
+[[bench]]
+name = "structured_session_contention"
+harness = false
+
+[[bin]]
+name = "release_bench"
+path = "tools/bin/release_bench.rs"
+required-features = ["huggingface-hub", "benchmark-tools"]
+
+[[bin]]
+name = "native_serve"
+path = "tools/bin/native_serve.rs"
+required-features = ["huggingface-hub", "benchmark-tools"]
+
+[[bin]]
+name = "rss_concurrency_probe"
+path = "tools/bin/rss_concurrency_probe.rs"
+required-features = ["huggingface-hub", "benchmark-tools"]
+
+# `tarpaulin_include` is set only by the coverage tool; register it so it is not an unknown cfg.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
+[[test]]
+name = "combos"
+required-features = ["test-utils"]
+
+[[test]]
+name = "differential"
+required-features = ["test-utils"]
+
+[[test]]
+name = "exhaustive"
+required-features = ["test-utils"]
+
+[[test]]
+name = "real_tokenizer"
+required-features = ["test-utils"]
+
+[[test]]
+name = "three_route_differential"
+required-features = ["test-utils"]
