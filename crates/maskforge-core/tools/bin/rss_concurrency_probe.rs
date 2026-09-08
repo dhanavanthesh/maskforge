@@ -18,6 +18,8 @@ use rustc_hash::FxHashMap;
 const SCHEMA: &str = r#"{"type":"object","properties":{"a":{"type":"boolean"},"b":{"type":"null"}},"required":["a","b"],"additionalProperties":false}"#;
 const CONCURRENCY_LEVELS: &[usize] = &[1, 8, 32, 128];
 
+// RSS comes from the Win32 process-status API; other targets report zero.
+#[cfg(windows)]
 fn peak_rss_bytes() -> u64 {
     use windows_sys::Win32::System::ProcessStatus::{
         GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
@@ -36,6 +38,7 @@ fn peak_rss_bytes() -> u64 {
     }
 }
 
+#[cfg(windows)]
 fn current_rss_bytes() -> u64 {
     use windows_sys::Win32::System::ProcessStatus::{
         GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
@@ -51,6 +54,16 @@ fn current_rss_bytes() -> u64 {
         }
         pmc.WorkingSetSize as u64
     }
+}
+
+#[cfg(not(windows))]
+fn peak_rss_bytes() -> u64 {
+    0
+}
+
+#[cfg(not(windows))]
+fn current_rss_bytes() -> u64 {
+    0
 }
 
 fn synthetic_near_cap_vocab() -> Vocabulary {
