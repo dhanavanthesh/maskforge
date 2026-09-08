@@ -68,7 +68,10 @@ def test_dataclass_round_trips_through_parse_json():
 
 
 def test_typed_dict_with_optional_keys():
-    class TD(typing.TypedDict, total=False):
+    # Pydantic requires the typing_extensions backport for TypedDict before 3.12.
+    typing_extensions = pytest.importorskip("typing_extensions")
+
+    class TD(typing_extensions.TypedDict, total=False):
         a: int
         b: str
 
