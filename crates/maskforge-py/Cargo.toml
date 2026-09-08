@@ -1,0 +1,27 @@
+[package]
+name = "maskforge-py"
+version.workspace = true
+publish = false
+description = "Python bindings for MaskForge: the PyO3 wall over the compiled artifact."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "maskforge"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+maskforge-core = { path = "../maskforge-core" }
+rustc-hash = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+
+[features]
+default = []
+python-bindings = ["dep:pyo3"]
+bench-internals = ["maskforge-core/bench-internals"]
+tokenizer-processing = ["maskforge-core/tokenizer-processing"]
+# Exposes the correctness corpus to Python; test suite only, never in production wheels.
+test-utils = ["maskforge-core/test-utils"]
