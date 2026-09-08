@@ -1,0 +1,25 @@
+[package]
+name = "maskforge-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+rustc-hash = "2.1.0"
+maskforge-core = { path = ".." }
+
+[[bin]]
+name = "diff_mask"
+path = "fuzz_targets/diff_mask.rs"
+test = false
+doc = false
+bench = false
+
+# Detached from the parent workspace: cargo-fuzz needs nightly + libFuzzer (Linux CI only), so it
+# must never be pulled into the default `cargo build --workspace`.
+[workspace]
