@@ -169,10 +169,7 @@ jobs:
     strategy:
       matrix:
         platform:
-          # macos-13 is real Intel hardware, so the x86_64 wheel below is actually import-tested.
-          - runner: macos-13
-            target: x86_64
-            macos_version: "13.0"
+          # Intel macOS runners are scarce and being retired; x86_64 Macs install from the sdist.
           - runner: macos-14
             target: aarch64
             macos_version: "14.0"
