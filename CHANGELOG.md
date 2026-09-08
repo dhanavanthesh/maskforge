@@ -4,7 +4,15 @@ All notable changes to MaskForge are documented here. Versioning follows
 [Semantic Versioning](https://semver.org/); before `1.0.0`, `0.y.z` releases may change the
 public API without a major bump (see the README's versioning-policy section).
 
-## [0.1.0] - unreleased
+## [0.1.1] - 2026-09-08
+
+### Fixed
+
+- Removed the `License :: OSI Approved :: Apache Software License` classifier. PyPI rejects a
+  distribution that declares both a PEP 639 `License-Expression` and a legacy license classifier,
+  which blocked the wheel upload. The SPDX `license = "Apache-2.0"` field is unchanged.
+
+## [0.1.0] - 2026-09-08
 
 First public alpha. Packaging identity, error contract, and documentation brought up to
 release-candidate quality; see `docs/development/program5-report.md` for the underlying
