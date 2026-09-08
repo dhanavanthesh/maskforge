@@ -47,7 +47,7 @@ jobs:
         source .venv/bin/activate
         python -m pip install --upgrade pip maturin
         maturin develop --features python-bindings,tokenizer-processing,test-utils,bench-internals
-        pip install pytest pytest-cov pytest-mock numpy torch transformers "pydantic>=2"
+        pip install pytest pytest-cov pytest-mock jsonschema numpy torch transformers "pydantic>=2"
     - name: Assert the build carries tokenizer processing
       run: |
         .venv/bin/python -c "import maskforge._native as n; assert hasattr(n.PyVocabulary, 'from_tokenizer_json'), 'build lacks tokenizer-processing'"
@@ -121,7 +121,8 @@ jobs:
       run: |
         if ! command -v cargo-audit &> /dev/null; then
           echo "cargo-audit is not found, installing..."
-          cargo install cargo-audit
+          # 0.22.2+ needs rustc 1.88; this workspace pins 1.86.
+          cargo install cargo-audit --version 0.22.1 --locked
         else
           echo "cargo-audit is cached"
         fi
