@@ -1,9 +1,8 @@
 name: Dry-run Publish
 
 on:
+  # Manual only: the full wheel matrix competes with a real release for scarce macOS runners.
   workflow_dispatch:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
