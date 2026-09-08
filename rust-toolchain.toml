@@ -1,0 +1,4 @@
+# Minimum pinned toolchain (floor, not ceiling): 1.86 with fmt + clippy.
+[toolchain]
+channel = "1.86"
+components = ["rustfmt", "clippy"]

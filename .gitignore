@@ -1,0 +1,29 @@
+__pycache__
+.benchmarks
+.cache
+.coverage
+.direnv
+.env
+.envrc
+.idea
+.pytest_cache
+.ruff_cache
+.venv
+.release-venv
+*.egg-info
+*.gguf
+*.pdb
+*.pyd
+*.so
+benchmarks/results
+benchmarks/env
+build
+# The workspace ships distributable native wheels, so the lock is reviewed and committed
+# for reproducible CI builds.
+dist
+docs/build
+logs
+rust-coverage
+target
+.mypy_cache
+.remember
