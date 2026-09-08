@@ -4,21 +4,62 @@
 
 **Schema-guided token masks for reliable structured generation in Rust and Python.**
 
+[![PyPI](https://img.shields.io/pypi/v/maskforge.svg)](https://pypi.org/project/maskforge/)
+[![crates.io](https://img.shields.io/crates/v/maskforge-core.svg)](https://crates.io/crates/maskforge-core)
+[![CI](https://github.com/dhanavanthesh/maskforge/actions/workflows/tests.yml/badge.svg)](https://github.com/dhanavanthesh/maskforge/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 </div>
 
-## What MaskForge is
+A language model can only emit a token that keeps the document valid. Not checked afterwards, not
+retried until it parses: constrained while it is being generated.
 
-MaskForge compiles a JSON Schema into a compact executable and, at every decoding step,
-produces a packed allowed-token bitmask over a tokenizer vocabulary. Regular schemas compile to
-a byte-level DFA; schemas that need order-independent objects or value memory (e.g. `not`,
-open objects, some array shapes) route to a structured matcher. Callers do not choose the
-backend themselves.
+```python
+generate = maskforge.Generator(maskforge.from_transformers(model, tokenizer), Invoice)
+invoice = generate("Extract the invoice:")   # already an Invoice, already valid
+```
 
-This is an **alpha release (0.1.0)**. The core compiler and correctness surface are well
-tested. The high-level API below is the supported surface; raw IR and index handles live in
-`maskforge.low_level` and change more freely. Pin an exact version.
+## How it works
+
+A JSON Schema compiles once into a reusable executable. At every decoding step the engine emits a
+packed allowed-token bitmask over the tokenizer vocabulary, so the sampler never sees a token that
+would break the schema.
+
+Two backends, chosen by the compiler rather than by the caller:
+
+- **Regular schemas** lower to a byte-level DFA, built with product, shuffle and Kleene state
+  elimination over a hash-consed arena IR.
+- **Everything else** - nesting, order-independent objects, value memory - runs on an incremental
+  pushdown matcher with a typed frame stack and a transactional undo log.
+
+Masks are computed by walking the vocabulary as a compressed-sparse-row trie *jointly* with the
+automaton, so a shared token prefix is parsed once and a dead subtree is pruned whole.
+
+## Beyond the regular fragment
+
+Most of JSON Schema compiles to a finite automaton. These keywords do not, and each one is
+supported here:
+
+| Keyword | Why it is hard |
+| --- | --- |
+| `unevaluatedProperties` / `unevaluatedItems` | annotations must flow across in-place applicators |
+| `$dynamicRef` / `$dynamicAnchor` | the target subschema depends on the dynamic scope |
+| `uniqueItems` | unbounded value memory, not finite state |
+| `contains` with `minContains` / `maxContains` | counting while the outcome is still undecided |
+| `dependentSchemas` | a subschema activates part-way through an object |
+| `oneOf` | kept as true exclusive-or, not weakened to `anyOf` |
+| `multipleOf` | a residue automaton, on decimals as well as integers |
+
+Every one of these runs in the real decoding loop, not as a post-hoc validation pass.
+
+Speed numbers are deliberately not published here: a throughput comparison only means something
+between engines solving the same problem on the same schema, and that is a benchmark worth doing
+properly or not at all.
+
+This is an **alpha release**. The core compiler and correctness surface are well tested. The
+high-level API below is the supported surface; raw IR and index handles live in
+`maskforge.low_level` and change more freely. Pin an exact version, and read the
+[known limitations](#known-limitations) before relying on it unattended.
 
 ## Installation
 

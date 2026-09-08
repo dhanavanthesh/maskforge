@@ -1,17 +1,29 @@
 # maskforge-core
 
-Schema-guided token masks for reliable structured generation in Rust. The crate compiles JSON
-Schema and regular expressions into reusable executables, binds them to exact tokenizer bytes,
-and produces a packed allowed-token bitmask at every decoding step.
+**Schema-guided token masks for reliable structured generation.**
 
-This crate has no PyO3 dependency and links standalone; the Python bindings live in the
-separate `maskforge-py` crate. See the [repository README](https://github.com/dhanavanthesh/maskforge)
-for the full project overview, verified model output, current JSON Schema support, and installation
-instructions for both Rust and Python.
+[![crates.io](https://img.shields.io/crates/v/maskforge-core.svg)](https://crates.io/crates/maskforge-core)
+[![docs.rs](https://img.shields.io/docsrs/maskforge-core)](https://docs.rs/maskforge-core)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-See the public [architecture](../../docs/architecture.md),
-[JSON Schema support](../../docs/development/json-schema-support.md), and
-[development roadmap](../../docs/development/to-do.md) for details.
+Compile a JSON Schema once, bind it to a tokenizer, and get a packed allowed-token bitmask at every
+decoding step. A model driven through these masks cannot emit a token that breaks the schema.
+
+Links standalone; no PyO3 dependency.
+
+## How it works
+
+JSON Schema lowers into a hash-consed arena IR, then a cost model picks a backend:
+
+- **Regular schemas** become a byte-level DFA, built with product and shuffle constructions and
+  Kleene state elimination. `multipleOf` compiles to a residue automaton.
+- **Everything else** runs on an incremental pushdown matcher: a typed frame stack, byte at a time,
+  with an undo log so a speculative byte costs no clone.
+
+Masks come from walking the vocabulary as a compressed-sparse-row trie jointly with the automaton.
+A shared token prefix is parsed once; a dead subtree is pruned whole.
+
+## Example
 
 ```rust
 use std::sync::Arc;
@@ -22,27 +34,37 @@ let mut token_map = TokenMap::default();
 for byte in 0u8..=u8::MAX {
     token_map.insert(vec![byte], vec![u32::from(byte)]);
 }
-let eos_token_id = 256;
-let schema_text = r#"{"type":"boolean"}"#;
-let token_id = maskforge_core::TokenId::try_from(b't' as usize)?;
-
-let vocabulary = CompiledVocabulary::try_from(Arc::new(build_vocabulary(eos_token_id, token_map)?))?;
+let vocabulary = CompiledVocabulary::try_from(Arc::new(build_vocabulary(256, token_map)?))?;
 
 let compiler = Compiler::new(CompilerOptions::default());
-let program = compiler.compile_json_schema(schema_text)?; // vocabulary-independent, reusable
-let bound = program.bind(&vocabulary)?; // picks regular or structured internally
+let program = compiler.compile_json_schema(r#"{"type":"boolean"}"#)?;
+let bound = program.bind(&vocabulary)?;
 let mut session = bound.start_session()?;
 
 let mut mask = vec![0u32; bound.mask_word_count()];
 session.write_mask(&mut mask)?;
-session.advance(token_id)?;
+session.advance(maskforge_core::TokenId::try_from(b't' as usize)?)?;
 ```
 
-The complete runnable version is in `examples/basic_json_schema.rs`. `Compiler` owns a configurable,
-clearable executable cache. `SchemaProgram`, `CompiledVocabulary`, and `BoundSchema` are immutable
-and reusable; each generated sequence owns one mutable `Session`.
+`SchemaProgram`, `CompiledVocabulary` and `BoundSchema` are immutable and shared. `Session` is the
+only mutable object, holding one sequence. Full version in `examples/basic_json_schema.rs`.
+
+## Correctness
+
+Every mask is checked three ways - optimized, full-trie and record-scan - and the routes must agree.
+The official JSON Schema Test Suite runs in CI.
+
+Limitations are documented, not left to be discovered:
+[known limitations](https://github.com/dhanavanthesh/maskforge#known-limitations).
+
+## More
+
+- [Repository](https://github.com/dhanavanthesh/maskforge)
+- [Architecture](https://github.com/dhanavanthesh/maskforge/blob/main/docs/architecture.md)
+- [Keyword support](https://github.com/dhanavanthesh/maskforge/blob/main/docs/development/json-schema-support.md)
+- Python bindings: [`maskforge`](https://pypi.org/project/maskforge/)
 
 ## License
 
 Apache-2.0. Portions derive from [outlines-core](https://github.com/dottxt-ai/outlines-core)
-(also Apache-2.0); see `PROVENANCE.md` for the file-by-file audit trail.
+(also Apache-2.0); `PROVENANCE.md` has the file-by-file trail.
