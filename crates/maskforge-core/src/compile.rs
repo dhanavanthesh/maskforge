@@ -1887,11 +1887,15 @@ mod tests {
     // 20+ seconds: array-of-array-of-oneOf, whose eliminated regex text doubled per array wrap.
     #[test]
     fn a_real_world_nested_array_of_array_of_one_of_schema_compiles_or_falls_back_fast() {
-        let schema = std::fs::read_to_string(format!(
+        // The jsonschemabench corpus is an optional local checkout, not part of this repository.
+        let path = format!(
             "{}/../../integration/jsonschemabench/data/Github_easy/o67463.json",
             env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
+        );
+        let Ok(schema) = std::fs::read_to_string(&path) else {
+            eprintln!("skipping: corpus not present at {path}");
+            return;
+        };
         let opts = CompileOptions {
             object_closure: crate::ir::ObjectClosure::AssumeClosedProfile,
             ..CompileOptions::default()

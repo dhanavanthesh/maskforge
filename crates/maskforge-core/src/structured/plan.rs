@@ -3920,6 +3920,10 @@ mod tests {
 
     #[test]
     fn long_reference_chain_compiles_iteratively() {
+        on_deep_stack(long_reference_chain_body);
+    }
+
+    fn long_reference_chain_body() {
         let mut builder = crate::ir::Builder::new(CompileOptions::default());
         let mut slots = Vec::new();
         for _ in 0..1024 {
@@ -4017,8 +4021,22 @@ mod tests {
         assert!(eight < many, "{eight} !< {many}");
     }
 
+    /// Runs a deep-graph test on a large stack; debug frames overflow the 2 MiB default.
+    fn on_deep_stack(body: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024)
+            .spawn(body)
+            .expect("spawn deep-graph test thread")
+            .join()
+            .expect("deep-graph test thread");
+    }
+
     #[test]
     fn deep_acyclic_dependent_schema_graph_compiles_iteratively() {
+        on_deep_stack(deep_acyclic_dependent_schema_graph_body);
+    }
+
+    fn deep_acyclic_dependent_schema_graph_body() {
         let mut builder = crate::ir::Builder::new(CompileOptions::default());
         let mut current = builder.boolean().unwrap();
         for index in 0..2048 {
@@ -4322,6 +4340,10 @@ mod tests {
 
     #[test]
     fn deep_acyclic_negation_reference_chain_compiles_iteratively() {
+        on_deep_stack(deep_acyclic_negation_reference_chain_body);
+    }
+
+    fn deep_acyclic_negation_reference_chain_body() {
         let mut builder = crate::ir::Builder::new(CompileOptions::default());
         let mut current = builder.boolean().unwrap();
         for _ in 0..2048 {

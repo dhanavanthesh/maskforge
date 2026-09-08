@@ -6307,10 +6307,15 @@ mod tests {
     fn mask_agrees_with_advance_across_the_structured_corpus() {
         const MAX_SCHEMAS: usize = 400;
         const MAX_STEPS: usize = 12;
+        // The jsonschemabench corpus is an optional local checkout, not part of this repository.
         let root = format!(
             "{}/../../integration/jsonschemabench/data",
             env!("CARGO_MANIFEST_DIR")
         );
+        if !std::path::Path::new(&root).is_dir() {
+            eprintln!("skipping: corpus not present at {root}");
+            return;
+        }
         let toks: Vec<(Vec<u8>, Vec<u32>)> = (0x20u32..=0x7e)
             .map(|b| (vec![b as u8], vec![b - 0x20]))
             .collect();

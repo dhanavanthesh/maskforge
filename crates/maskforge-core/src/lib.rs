@@ -4,7 +4,8 @@
 //! Architecture: <https://github.com/dhanavanthesh/maskforge/blob/main/docs/architecture.md>.
 
 #![deny(rust_2018_idioms)]
-#![warn(missing_docs)]
+// `bench-internals` only widens visibility for benchmarks and never ships.
+#![cfg_attr(not(feature = "bench-internals"), warn(missing_docs))]
 
 pub mod api;
 pub mod automaton;
