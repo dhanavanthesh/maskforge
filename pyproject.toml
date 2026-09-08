@@ -1,0 +1,60 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "maskforge"
+dynamic = ["version"]
+description = "Fast, bounded JSON Schema constrained decoding for Rust and Python."
+requires-python = ">=3.11"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = [
+    "structured-generation",
+    "constrained-decoding",
+    "json-schema",
+    "llm",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+pydantic = ["pydantic>=2"]
+# Floors are the lowest versions this project actually runs its tests against.
+transformers = [
+    "transformers>=5.15.0",
+    "torch>=2.13.0",
+    "numpy>=2.5.2",
+]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "numpy>=2.5.2",
+    "torch>=2.13.0",
+    "transformers>=5.15.0",
+    "pydantic>=2",
+]
+
+[project.urls]
+Homepage = "https://github.com/dhanavanthesh/maskforge"
+Repository = "https://github.com/dhanavanthesh/maskforge"
+Issues = "https://github.com/dhanavanthesh/maskforge/issues"
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "crates/maskforge-py/Cargo.toml"
+python-source = "crates/maskforge-py/python"
+module-name = "maskforge._native"
+# tokenizer-processing carries PyVocabulary.from_tokenizer_json, which from_transformers needs.
+features = ["python-bindings", "tokenizer-processing"]
+
+[tool.pytest.ini_options]
+testpaths = ["crates/maskforge-py/tests"]
+filterwarnings = []
