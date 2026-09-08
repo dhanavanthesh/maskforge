@@ -1,0 +1,129 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  style:
+    name: Check the code style
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+    - run: cargo fmt --all --check
+    - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  python-tests:
+    name: Run python tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+    - name: Set up test environment
+      # Builds once via maturin develop from the root manifest; test extras install by name to
+      # avoid a second build. tokenizer-processing must be present or from_transformers breaks.
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        python -m pip install --upgrade pip maturin
+        maturin develop --features python-bindings,tokenizer-processing,test-utils,bench-internals
+        pip install pytest pytest-cov pytest-mock numpy torch transformers "pydantic>=2"
+    - name: Assert the build carries tokenizer processing
+      run: |
+        .venv/bin/python -c "import maskforge._native as n; assert hasattr(n.PyVocabulary, 'from_tokenizer_json'), 'build lacks tokenizer-processing'"
+    - name: Run tests
+      run: .venv/bin/python -m pytest crates/maskforge-py/tests -vv
+
+  cargo-test:
+    name: Run Cargo tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+    - run: cargo test -p maskforge-core
+    - run: cargo test -p maskforge-core --all-features
+    - run: cargo test -p maskforge-py --features python-bindings,test-utils,bench-internals
+
+  build-wheel:
+    name: Build wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - run: pip install -U maturin twine
+      - run: maturin build --release --out dist
+      - run: maturin sdist --out dist
+      - run: twine check --strict dist/*
+      - name: Inspect the archive contents
+        run: |
+          python - <<'PY'
+          import glob, pathlib, sys, tarfile, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          required = ["maskforge/py.typed", "maskforge/__init__.py", "maskforge/generator.py"]
+          missing = [r for r in required if r not in names]
+          if missing:
+              sys.exit(f"wheel is missing {missing}")
+          if not any(n.startswith("maskforge/_native") for n in names):
+              sys.exit("wheel has no _native extension")
+          if not any(n.endswith(("METADATA", "LICENSE", "licenses/LICENSE")) for n in names):
+              sys.exit("wheel has no metadata/licence")
+          leaked = [n for n in names if "/tests/" in n or n.startswith("integration/")]
+          if leaked:
+              sys.exit(f"wheel leaks non-runtime files: {leaked[:5]}")
+          sdist = glob.glob("dist/*.tar.gz")[0]
+          members = tarfile.open(sdist).getnames()
+          if not any(m.endswith("README.md") for m in members):
+              sys.exit("sdist has no README.md")
+          print(f"wheel {pathlib.Path(wheel).name}: {len(names)} entries, contents verified")
+          PY
+      - name: End-to-end test the released wheel in a clean environment
+        run: |
+          python -m venv .wheelenv
+          .wheelenv/bin/pip install dist/*.whl
+          .wheelenv/bin/python .github/scripts/wheel_smoke.py
+
+  cargo-audit:
+    name: Run Cargo audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+    - name: Install cargo audit if not cached
+      run: |
+        if ! command -v cargo-audit &> /dev/null; then
+          echo "cargo-audit is not found, installing..."
+          cargo install cargo-audit
+        else
+          echo "cargo-audit is cached"
+        fi
+    - name: Run cargo audit
+      run: cargo audit

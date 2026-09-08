@@ -1,0 +1,181 @@
+name: Publish crates.io and PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0). Must already exist and match the committed version."
+        required: true
+  release:
+    types:
+      - created
+
+# Least privilege by default; each job widens only what it needs.
+permissions:
+  contents: read
+
+jobs:
+  resolve_tag:
+    name: Resolve and validate the release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve tag from the triggering event
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="$REF_NAME"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "release tag '$TAG' must be 'v' followed by valid SemVer (e.g. v0.1.0)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ steps.resolve.outputs.tag }}
+          fetch-depth: 0
+
+      # Refuses to proceed unless the tag, the manifest and HEAD all agree. The source is
+      # never rewritten, so every artifact is a product of exactly this commit.
+      - name: Validate the tag matches the committed version
+        uses: ./.github/actions/validate_version
+        with:
+          tag: ${{ steps.resolve.outputs.tag }}
+
+  build_wheels:
+    needs: resolve_tag
+    uses: ./.github/workflows/build_wheels.yml
+    with:
+      tag: ${{ needs.resolve_tag.outputs.tag }}
+
+  verify:
+    name: Verify artifacts before any upload
+    needs: [resolve_tag, build_wheels]
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.checksums.outputs.digests }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.resolve_tag.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - run: pip install -U twine
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdist
+          path: dist
+
+      # Everything that can fail must fail here, before the first irreversible upload.
+      - name: Validate Python distributions
+        run: twine check --strict dist/*
+
+      - name: Package and dry-run the crate
+        run: |
+          set -euo pipefail
+          cargo package -p maskforge-core
+          cargo publish -p maskforge-core --dry-run
+
+      - name: Record artifact checksums
+        id: checksums
+        run: |
+          set -euo pipefail
+          shasum -a 256 dist/* target/package/*.crate | tee SHA256SUMS.txt
+          {
+            echo 'digests<<EOF'
+            cat SHA256SUMS.txt
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: checksums
+          path: SHA256SUMS.txt
+
+  publish_crate:
+    name: Publish maskforge-core to crates.io
+    needs: [resolve_tag, verify]
+    runs-on: ubuntu-latest
+    # A protected environment gates this behind manual approval and scoped secrets.
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.resolve_tag.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+
+      - name: Validate the tag matches the committed version
+        uses: ./.github/actions/validate_version
+        with:
+          tag: ${{ needs.resolve_tag.outputs.tag }}
+
+      # crates.io first: it is the immutable one. If it fails, PyPI is never touched.
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p maskforge-core
+
+  publish_pypi:
+    name: Publish maskforge to PyPI
+    needs: [resolve_tag, verify, publish_crate]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Trusted Publishing mints a short-lived credential; no long-lived API token is stored.
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdist
+          path: dist
+
+      # Attest the artifacts that are about to be uploaded, not a rebuilt copy of them.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v2
+        with:
+          subject-path: dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        with:
+          packages-dir: dist
+          print-hash: true

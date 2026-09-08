@@ -1,0 +1,25 @@
+name: Validate release version
+description: >-
+  Fails unless the tag, the workspace manifest version and the checked-out commit all agree.
+  Never modifies the source tree.
+
+inputs:
+  tag:
+    description: 'Release tag, e.g. v0.1.0 (never a branch name or ref).'
+    required: true
+  manifest:
+    description: 'Workspace manifest to read the version from.'
+    required: false
+    default: 'Cargo.toml'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate tag against the manifest and the checked-out commit
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        MANIFEST: ${{ inputs.manifest }}
+      run: |
+        set -euo pipefail
+        python3 "${GITHUB_ACTION_PATH}/validate_version.py" "$TAG" --manifest "$MANIFEST"
