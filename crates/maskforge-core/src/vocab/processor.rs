@@ -1,3 +1,5 @@
+// Modified from outlines-core; see PROVENANCE.md.
+
 //! Post-processing operations for the tokens before they being inserted into
 //! `Vocabulary`, strategies depend on the tokenizer's level.
 

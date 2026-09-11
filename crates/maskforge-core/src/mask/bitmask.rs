@@ -1,3 +1,5 @@
+// Derived from outlines-core; see PROVENANCE.md.
+
 //! Stores allowed-token masks as packed `u32` words.
 
 use crate::error::{CompileError, ErrorCode, Stage};

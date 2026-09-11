@@ -1,3 +1,5 @@
+// Modified from outlines-core; see PROVENANCE.md.
+
 //! Parsing known locations for `eos_token_id` information.
 
 use hf_hub::api::sync::ApiBuilder;

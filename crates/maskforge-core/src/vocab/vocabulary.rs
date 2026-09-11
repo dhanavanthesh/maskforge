@@ -1,3 +1,5 @@
+// Modified from outlines-core; see PROVENANCE.md.
+
 //! Creates `Vocabulary` manually or from pretrained large language model.
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
