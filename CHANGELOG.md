@@ -92,14 +92,14 @@ compiler-correctness evidence this release rests on.
 
 ### Fixed
 
-- `ConstraintSession`: committing EOS did not transition the session to a terminal state —
-  ordinary tokens committed afterward were silently accepted instead of raising, and
+- `ConstraintSession`: committing EOS did not transition the session to a terminal state.
+  Ordinary tokens committed afterward were silently accepted instead of raising, and
   `mask_into()`/`allowed_ids()` kept showing the pre-stop mask. Added an explicit
   Active/Stopped lifecycle; `reset()` clears it. `replay()` is now transactional: on failure
   the session is left at the empty prefix, never partially replayed.
 - The Rust facade's `Session::advance` for the structured backend silently treated a rejected
   token as success (`StructuredMatcher::advance` signals rejection via `Ok(false)`, not `Err`,
-  and the return value was being discarded) — now surfaces `SessionError::IllegalToken`.
+  and the return value was being discarded); now surfaces `SessionError::IllegalToken`.
 - Root package identity (was `outlines_core`, now `maskforge`) in `pyproject.toml`,
   `Cargo.toml`, CI workflows, and the Makefile.
 - `hugginface-hub` Cargo feature typo, renamed to `huggingface-hub`.
@@ -114,6 +114,6 @@ compiler-correctness evidence this release rests on.
 
 ### Known limitations
 
-See the README's "Known limitations" section: single-sequence generation only, no full
+See the README's "What's not finished yet" section: single-sequence generation only, no full
 Draft 2020-12 Format-Assertion vocabulary, Hugging Face integration measured for
 mask-application only.

@@ -55,7 +55,7 @@ Every mask is checked three ways - optimized, full-trie and record-scan - and th
 The official JSON Schema Test Suite runs in CI.
 
 Limitations are documented, not left to be discovered:
-[known limitations](https://github.com/dhanavanthesh/maskforge#known-limitations).
+[what's not finished yet](https://github.com/dhanavanthesh/maskforge#whats-not-finished-yet).
 
 ## More
 

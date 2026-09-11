@@ -36,9 +36,8 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 make test
 ```
 
-Read `project-instruction.log` before touching `crates/maskforge-core/src/` — it has the
-project's hygiene rules (comment length, no AI-sounding language, no internal planning
-references in shipped code) enforced on every review.
+`crates/maskforge-core/src/` is held to a few hygiene rules on every review: keep comments to one
+line, avoid AI-sounding language, and never leave internal planning references in shipped code.
 
 ## Reporting a bug
 
