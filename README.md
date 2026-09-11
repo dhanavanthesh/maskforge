@@ -4,6 +4,9 @@
 
 **Schema-guided token masks for reliable structured generation in Rust and Python.**
 
+Compile a JSON Schema once, bind it to a tokenizer, and get a packed allowed-token bitmask at
+every decoding step.
+
 [![PyPI](https://img.shields.io/pypi/v/maskforge.svg)](https://pypi.org/project/maskforge/)
 [![crates.io](https://img.shields.io/crates/v/maskforge-core.svg)](https://crates.io/crates/maskforge-core)
 [![CI](https://github.com/dhanavanthesh/maskforge/actions/workflows/tests.yml/badge.svg)](https://github.com/dhanavanthesh/maskforge/actions/workflows/tests.yml)
